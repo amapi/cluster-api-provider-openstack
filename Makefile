@@ -24,7 +24,7 @@ include $(ROOT_DIR_RELATIVE)/common.mk
 export GO111MODULE=on
 unexport GOPATH
 
-VERSION=v1.0.1
+VERSION=v0.6.4
 REGISTRY=docker.io/amapi
 
 # Directories.
