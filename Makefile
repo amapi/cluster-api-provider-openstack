@@ -372,6 +372,8 @@ upload-staging-artifacts: ## Upload release artifacts to the staging bucket
 
 .PHONY: create-gh-release
 create-gh-release:$(GH) ## Create release on Github
+	mkdir -p $(RELEASE_DIR)
+	touch  CHANGELOG.md
 	cp -f CHANGELOG.md $(RELEASE_DIR)/CHANGELOG.md
 	$(GH) release create $(VERSION) -d -F $(RELEASE_DIR)/CHANGELOG.md -t $(VERSION) -R $(GH_REPO)
 
