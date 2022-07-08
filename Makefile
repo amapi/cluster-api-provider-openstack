@@ -228,7 +228,8 @@ generate: ## Generate code
 
 .PHONY: generate-go
 generate-go: $(MOCKGEN)
-	$(MAKE) -B $(CONTROLLER_GEN) $(CONVERSION_GEN) $(DEFAULTER_GEN) $(GH)
+	$(MAKE) -B $(GH)
+	$(MAKE) -B $(CONTROLLER_GEN) $(CONVERSION_GEN) $(DEFAULTER_GEN) 
 	$(CONTROLLER_GEN) \
 		paths=./api/... \
 		object:headerFile=./hack/boilerplate/boilerplate.generatego.txt
