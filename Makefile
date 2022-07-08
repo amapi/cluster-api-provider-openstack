@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 ROOT_DIR_RELATIVE := .
 
 include $(ROOT_DIR_RELATIVE)/common.mk
@@ -23,6 +24,9 @@ include $(ROOT_DIR_RELATIVE)/common.mk
 export GO111MODULE=on
 unexport GOPATH
 
+VERSION=v1.0.1
+REGISTRY=docker.io/amapi
+
 # Directories.
 ARTIFACTS ?= $(REPO_ROOT)/_artifacts
 TOOLS_DIR := hack/tools
@@ -31,7 +35,7 @@ TOOLS_BIN_DIR := $(TOOLS_DIR)/bin
 
 BIN_DIR := bin
 REPO_ROOT := $(shell git rev-parse --show-toplevel)
-GH_REPO ?= kubernetes-sigs/cluster-api-provider-openstack
+GH_REPO ?= amapi/cluster-api-provider-openstack
 TEST_E2E_DIR := test/e2e
 
 # Files
@@ -47,6 +51,7 @@ CONVERSION_GEN := $(TOOLS_BIN_DIR)/conversion-gen
 DEFAULTER_GEN := $(TOOLS_BIN_DIR)/defaulter-gen
 ENVSUBST := $(TOOLS_BIN_DIR)/envsubst
 GINKGO := $(TOOLS_BIN_DIR)/ginkgo
+GH := $(TOOLS_BIN_DIR)/gh
 GOJQ := $(TOOLS_BIN_DIR)/gojq
 GOLANGCI_LINT := $(TOOLS_BIN_DIR)/golangci-lint
 KIND := $(TOOLS_BIN_DIR)/kind
@@ -79,10 +84,10 @@ endif
 
 # Release variables
 
-STAGING_REGISTRY := gcr.io/k8s-staging-capi-openstack
-STAGING_BUCKET ?= artifacts.k8s-staging-capi-openstack.appspot.com
+STAGING_REGISTRY := docker.io/amapi
+STAGING_BUCKET ?= amapi/cluster-api-provider-openstack
 BUCKET ?= $(STAGING_BUCKET)
-PROD_REGISTRY ?= k8s.gcr.io/capi-openstack
+PROD_REGISTRY ?= docker.io/amapi
 REGISTRY ?= $(STAGING_REGISTRY)
 RELEASE_TAG ?= $(shell git describe --abbrev=0 2>/dev/null)
 PULL_BASE_REF ?= $(RELEASE_TAG) # PULL_BASE_REF will be provided by Prow
@@ -97,7 +102,7 @@ ALL_ARCH ?= amd64 arm arm64 ppc64le s390x
 IMAGE_NAME ?= capi-openstack-controller
 CONTROLLER_IMG ?= $(REGISTRY)/$(IMAGE_NAME)
 CONTROLLER_IMG_TAG ?= $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-CONTROLLER_ORIGINAL_IMG := gcr.io/k8s-staging-capi-openstack/capi-openstack-controller
+CONTROLLER_ORIGINAL_IMG := docker.io/amapi/capi-openstack-controller
 CONTROLLER_NAME := capo-controller-manager
 MANIFEST_FILE := infrastructure-components
 CONFIG_DIR := config
@@ -220,18 +225,18 @@ generate: ## Generate code
 	$(MAKE) generate-go
 	$(MAKE) generate-manifests
 
+
 .PHONY: generate-go
 generate-go: $(MOCKGEN)
-	$(MAKE) -B $(CONTROLLER_GEN) $(CONVERSION_GEN) $(DEFAULTER_GEN)
+	$(MAKE) -B $(CONTROLLER_GEN) $(CONVERSION_GEN) $(DEFAULTER_GEN) $(GH)
 	$(CONTROLLER_GEN) \
 		paths=./api/... \
 		object:headerFile=./hack/boilerplate/boilerplate.generatego.txt
 	$(CONVERSION_GEN) \
 		--input-dirs=./api/v1alpha3 \
-		--output-file-base=zz_generated.conversion \
-		--go-header-file=./hack/boilerplate/boilerplate.generatego.txt
-	$(CONVERSION_GEN) \
 		--input-dirs=./api/v1alpha4 \
+		--input-dirs=./api/v1alpha5 \
+		--input-dirs=./api/v1alpha6 \
 		--output-file-base=zz_generated.conversion \
 		--go-header-file=./hack/boilerplate/boilerplate.generatego.txt
 	go generate ./...
@@ -361,10 +366,12 @@ release-staging-nightly: ## Tags and push container images to the staging bucket
 
 .PHONY: upload-staging-artifacts
 upload-staging-artifacts: ## Upload release artifacts to the staging bucket
-	gsutil cp $(RELEASE_DIR)/* gs://$(STAGING_BUCKET)/components/$(RELEASE_ALIAS_TAG)/
+	$(GH) release upload $(VERSION) -R $(GH_REPO) --clobber  $(RELEASE_DIR)/*
+
 
 .PHONY: create-gh-release
 create-gh-release:$(GH) ## Create release on Github
+	cp -f CHANGELOG.md $(RELEASE_DIR)/CHANGELOG.md
 	$(GH) release create $(VERSION) -d -F $(RELEASE_DIR)/CHANGELOG.md -t $(VERSION) -R $(GH_REPO)
 
 .PHONY: upload-gh-artifacts
@@ -373,7 +380,9 @@ upload-gh-artifacts: $(GH) ## Upload artifacts to Github release
 
 .PHONY: release-alias-tag
 release-alias-tag: # Adds the tag to the last build tag.
-	gcloud container images add-tag -q $(CONTROLLER_IMG):$(TAG) $(CONTROLLER_IMG):$(RELEASE_ALIAS_TAG)
+	docker pull $(CONTROLLER_IMG):$(TAG)
+	docker tag $(CONTROLLER_IMG):$(TAG) $(CONTROLLER_IMG):$(RELEASE_ALIAS_TAG)
+	docker push $(CONTROLLER_IMG):$(RELEASE_ALIAS_TAG)
 
 .PHONY: release-notes
 release-notes: $(RELEASE_NOTES) ## Generate release notes
