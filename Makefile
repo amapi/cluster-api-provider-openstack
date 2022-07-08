@@ -299,7 +299,7 @@ docker-push-manifest: ## Push the fat manifest docker image.
 
 .PHONY: staging-manifests
 staging-manifests:
-	$(MAKE) $(RELEASE_DIR)/$(MANIFEST_FILE).yaml PULL_POLICY=IfNotPresent TAG=$(RELEASE_ALIAS_TAG)
+	$(MAKE) $(RELEASE_DIR)/$(MANIFEST_FILE).yaml PULL_POLICY=Always TAG=$(RELEASE_ALIAS_TAG)
 
 ## --------------------------------------
 ## Release
